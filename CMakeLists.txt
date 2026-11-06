@@ -12,7 +12,7 @@ set(MOD_NAME "Addon Manager" CACHE STRING "LeviLauncher mod display name")
 set(MOD_AUTHOR "Erick" CACHE STRING "LeviLauncher mod author")
 set(MOD_VERSION "0.1.0" CACHE STRING "LeviLauncher mod version")
 set(MOD_LIBRARY_NAME "addon_manager" CACHE STRING "Native library name without lib prefix or .so suffix")
-set(MOD_MINECRAFT_VERSIONS "[\"1.26.*\", \"1.27.*\"]" CACHE STRING "Raw JSON array for manifest minecraft_versions")
+set(MOD_MINECRAFT_VERSIONS "[\"1.26.*\"]" CACHE STRING "Raw JSON array for manifest minecraft_versions")
 set(MOD_ICON "" CACHE STRING "Optional package-relative icon path, such as icon.png")
 
 include(FetchContent)
@@ -20,8 +20,7 @@ include(FetchContent)
 FetchContent_Declare(
     preloader_android
     GIT_REPOSITORY https://github.com/LiteLDev/preloader-android.git
-    GIT_TAG 0.2.2
-    SOURCE_SUBDIR cmake/preloader-sdk
+    GIT_TAG main
 )
 FetchContent_Declare(
     nlohmann_json
@@ -46,7 +45,17 @@ FetchContent_Declare(
 set(FMT_DOC OFF CACHE BOOL "Disable fmt docs" FORCE)
 set(FMT_TEST OFF CACHE BOOL "Disable fmt tests" FORCE)
 set(FMT_INSTALL OFF CACHE BOOL "Disable fmt install rules" FORCE)
-FetchContent_MakeAvailable(preloader_android nlohmann_json boost_pfr magic_enum fmt)
+FetchContent_MakeAvailable(nlohmann_json boost_pfr magic_enum fmt)
+
+# Only download the preloader sources (its root CMakeLists refuses non-Android builds,
+# and we add it ourselves below for Android).
+if(POLICY CMP0169)
+    cmake_policy(SET CMP0169 OLD)
+endif()
+FetchContent_GetProperties(preloader_android)
+if(NOT preloader_android_POPULATED)
+    FetchContent_Populate(preloader_android)
+endif()
 
 FetchContent_GetProperties(preloader_android)
 set(LEVI_PRELOADER_INCLUDE_DIR "${preloader_android_SOURCE_DIR}/include")

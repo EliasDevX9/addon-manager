@@ -162,14 +162,13 @@ void AddonManagerMod::startImport() {
             publishMenu();
             return;
         }
-        std::string path = r.path;
-        std::string name = r.displayName;
+        std::string filePath = r.path;
+        std::string fileName = r.displayName;
         // Run off the UI thread: unzipping can take a while.
         if (mWorker.joinable())
             mWorker.join();
-        mWorker = std::thread([this, path = std::move(path), name = std::move(name)]() mutable {
-            runImport(std::move(path), std::move(name));
-        });
+        mWorker = std::thread(&AddonManagerMod::runImport, this, std::move(filePath),
+                              std::move(fileName));
     });
     if (!launched) {
         mImporting = false;
