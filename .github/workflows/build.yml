@@ -11,18 +11,20 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android build tools
+      - name: Install Android NDK
         run: |
-          sdkmanager "platforms;android-28" "ndk;28.2.13676358"
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKMANAGER="$(ls -d "$SDK"/cmdline-tools/*/bin/sdkmanager | head -1)"
+          echo "Using $SDKMANAGER"
+          yes | "$SDKMANAGER" --sdk_root="$SDK" --licenses > /dev/null || true
+          "$SDKMANAGER" --sdk_root="$SDK" "platforms;android-28" "ndk;28.2.13676358"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
           sudo apt-get update
           sudo apt-get install -y ninja-build
 
