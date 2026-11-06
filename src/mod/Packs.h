@@ -37,6 +37,9 @@ struct ImportResult {
 std::filesystem::path findComMojang(const std::filesystem::path &modDir,
                                     const std::string &overridePath);
 
+// Human-readable log of the last findComMojang() search (for diagnostics).
+const std::string &lastComMojangSearchLog();
+
 std::vector<WorldInfo> listWorlds(const std::filesystem::path &comMojang);
 std::vector<PackInfo> listInstalledPacks(const std::filesystem::path &comMojang);
 

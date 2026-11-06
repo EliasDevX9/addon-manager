@@ -473,58 +473,122 @@ std::string stripFormatting(const std::string &text) {
     return out;
 }
 
+namespace {
+std::string gSearchLog;
+
+int countDirs(const fs::path &dir) {
+    std::error_code ec;
+    int n = 0;
+    for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
+        std::error_code e2;
+        if (it->is_directory(e2))
+            ++n;
+    }
+    return n;
+}
+
+int scoreComMojang(const fs::path &c) {
+    return countDirs(c / "minecraftWorlds") * 100 + countDirs(c / "behavior_packs") +
+           countDirs(c / "resource_packs");
+}
+
+// Looks for directories named com.mojang under `root`, at most `depth` levels deep.
+void searchTree(const fs::path &root, int depth, std::vector<fs::path> &out) {
+    std::error_code ec;
+    if (depth < 0 || !fs::is_directory(root, ec))
+        return;
+    if (root.filename() == "com.mojang") {
+        out.push_back(root);
+        return;
+    }
+    for (fs::directory_iterator it(root, ec), end; !ec && it != end; it.increment(ec)) {
+        std::error_code e2;
+        if (it->is_directory(e2))
+            searchTree(it->path(), depth - 1, out);
+    }
+}
+
+std::string selfPackageName() {
+    std::string text;
+    if (!readFile("/proc/self/cmdline", text, 512))
+        return {};
+    const auto nul = text.find('\0');
+    if (nul != std::string::npos)
+        text.resize(nul);
+    return text;
+}
+} // namespace
+
+const std::string &lastComMojangSearchLog() { return gSearchLog; }
+
 fs::path findComMojang(const fs::path &modDir, const std::string &overridePath) {
     std::error_code ec;
+    std::vector<fs::path> candidates;
+    auto add = [&](const fs::path &c) {
+        if (c.empty())
+            return;
+        if (std::find(candidates.begin(), candidates.end(), c) == candidates.end())
+            candidates.push_back(c);
+    };
+
+    // 1. Explicit override always wins when it is valid.
     if (!overridePath.empty()) {
         const fs::path p(overridePath);
-        if (isComMojang(p))
-            return p;
-        if (isComMojang(p / "com.mojang"))
-            return p / "com.mojang";
-        if (isComMojang(p / "games" / "com.mojang"))
-            return p / "games" / "com.mojang";
+        for (const fs::path &c : {p, p / "com.mojang", p / "games" / "com.mojang"}) {
+            if (isComMojang(c)) {
+                gSearchLog = "config: " + c.string();
+                return c;
+            }
+        }
     }
 
-    // Walk up from the mod directory.
+    // 2. Ancestors of the mod directory.
     fs::path p = modDir;
     for (int i = 0; i < 10 && !p.empty(); ++i) {
-        if (p.filename() == "com.mojang" && isComMojang(p))
-            return p;
-        for (const fs::path &candidate : {p / "games" / "com.mojang",
-                                          p / "files" / "games" / "com.mojang"}) {
-            if (isComMojang(candidate))
-                return candidate;
-        }
+        if (p.filename() == "com.mojang")
+            add(p);
+        add(p / "games" / "com.mojang");
+        add(p / "files" / "games" / "com.mojang");
         const fs::path parent = p.parent_path();
         if (parent == p)
             break;
         p = parent;
     }
 
-    // Well-known Android locations; pick the one with the most recent activity.
-    std::vector<fs::path> candidates;
+    // 3. The package that is running this process (the launcher hosting Minecraft).
+    const std::string pkg = selfPackageName();
     for (const char *base : {"/storage/emulated/0", "/sdcard"}) {
-        const fs::path data = fs::path(base) / "Android" / "data";
-        for (fs::directory_iterator it(data, ec), end; !ec && it != end; it.increment(ec)) {
-            const fs::path c = it->path() / "files" / "games" / "com.mojang";
-            if (isComMojang(c))
-                candidates.push_back(c);
+        const fs::path root(base);
+        if (!pkg.empty()) {
+            add(root / "Android" / "data" / pkg / "files" / "games" / "com.mojang");
+            searchTree(root / "Android" / "data" / pkg, 5, candidates);
         }
+        // 4. Every other package and common shared folders.
+        const fs::path data = root / "Android" / "data";
+        for (fs::directory_iterator it(data, ec), end; !ec && it != end; it.increment(ec))
+            add(it->path() / "files" / "games" / "com.mojang");
         ec.clear();
-        const fs::path direct = fs::path(base) / "games" / "com.mojang";
-        if (isComMojang(direct))
-            candidates.push_back(direct);
+        add(root / "games" / "com.mojang");
+        searchTree(root / "games", 5, candidates);
     }
+
+    // Pick the candidate that actually has the most worlds / packs.
     fs::path best;
-    fs::file_time_type bestTime = fs::file_time_type::min();
+    int bestScore = -1;
+    std::string log = "pkg=" + (pkg.empty() ? std::string("?") : pkg) + "; modDir=" + modDir.string();
     for (const auto &c : candidates) {
-        std::error_code e;
-        const auto t = fs::last_write_time(c / "minecraftWorlds", e);
-        if (best.empty() || (!e && t > bestTime)) {
+        if (!isComMojang(c))
+            continue;
+        const int score = scoreComMojang(c);
+        log += "; [" + std::to_string(score) + "] " + c.string();
+        if (score > bestScore) {
             best = c;
-            bestTime = e ? fs::file_time_type::min() : t;
+            bestScore = score;
         }
     }
+    if (best.empty())
+        log += "; ninguna candidata";
+    gSearchLog = log;
     return best;
 }
 

@@ -285,6 +285,10 @@ std::string AddonManagerMod::buildSchema() {
     };
 
     info("status", "Estado", mStatus);
+    info("path", "Carpeta del juego",
+         mComMojang.empty() ? std::string("No encontrada. ") + addon::lastComMojangSearchLog()
+                            : mComMojang.string() + " (" + std::to_string(mWorlds.size()) +
+                                  " mundos, " + std::to_string(mPacks.size()) + " packs)");
 
     section("sec_import", "Importar");
     button("import", "Importar addon", ".mcaddon, .mcpack o .zip desde tu telefono",
