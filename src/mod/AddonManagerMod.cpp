@@ -237,7 +237,7 @@ void AddonManagerMod::togglePack(const std::string &key, bool active) {
                          " en \"" + world->name + "\".";
                 if (changed > 1)
                     status += " (+" + std::to_string(changed - 1) + " dependencia(s))";
-                status += " Guarda y vuelve a entrar al mundo para aplicarlo.";
+                status += " Para aplicarlo prueba escribir /reload en el chat (anfitrion, con trucos). Si no basta, guarda y vuelve a entrar al mundo.";
             } else {
                 status = "Error: " + error;
             }
@@ -360,8 +360,9 @@ std::string AddonManagerMod::buildSchema() {
     addPacks(addon::PackKind::Resource, "sec_rp", "Resource packs", "rp_", activeRp);
 
     info("hint", "Importante",
-         "Minecraft carga los packs al entrar al mundo. Despues de activar o quitar uno, guarda y "
-         "sal del mundo y vuelve a entrar. Si juegas con amigos, el anfitrion debe reentrar.");
+         "Despues de activar o quitar un pack escribe /reload en el chat (solo el anfitrion, con "
+         "trucos activados). Recarga funciones, scripts y datos sin salir del mundo. Si algo no "
+         "cambia, guarda y vuelve a entrar. Haz copia del mundo antes de quitar un behavior pack.");
     return builder.toJson();
 }
 
