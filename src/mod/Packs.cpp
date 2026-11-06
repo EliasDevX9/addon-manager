@@ -549,6 +549,10 @@ fs::path findComMojang(const fs::path &modDir, const std::string &overridePath) 
             add(p);
         add(p / "games" / "com.mojang");
         add(p / "files" / "games" / "com.mojang");
+        // LeviLauncher layout: <pkg>/internal/games/com.mojang (worlds + user packs)
+        // and <pkg>/external/games/com.mojang (launcher-injected packs).
+        add(p / "internal" / "games" / "com.mojang");
+        add(p / "external" / "games" / "com.mojang");
         const fs::path parent = p.parent_path();
         if (parent == p)
             break;
@@ -563,6 +567,13 @@ fs::path findComMojang(const fs::path &modDir, const std::string &overridePath) 
             add(root / "Android" / "data" / pkg / "files" / "games" / "com.mojang");
             searchTree(root / "Android" / "data" / pkg, 5, candidates);
         }
+        // LeviLauncher keeps game data under Android/media/org.levimc.*.
+        const fs::path media = root / "Android" / "media";
+        for (fs::directory_iterator it(media, ec), end; !ec && it != end; it.increment(ec)) {
+            if (it->path().filename().string().rfind("org.levimc", 0) == 0)
+                searchTree(it->path(), 7, candidates);
+        }
+        ec.clear();
         // 4. Every other package and common shared folders.
         const fs::path data = root / "Android" / "data";
         for (fs::directory_iterator it(data, ec), end; !ec && it != end; it.increment(ec))
